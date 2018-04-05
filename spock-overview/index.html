@@ -13,7 +13,7 @@
 		<!-- Theme used for syntax highlighting of code -->
 		<link rel="stylesheet" href="lib/css/zenburn.css">
                 
-                <script defer src="js/fontawesome-all.min.js"></script>
+    <script defer src="js/fontawesome-all.min.js"></script>
 
 		<!-- Printing and PDF exports -->
 		<script>
@@ -27,12 +27,257 @@
 	<body>
 		<div class="reveal">
 			<div class="slides">
-                                <section data-markdown class="title-slide" data-background-image="images/background_title.png">
-                                  <textarea data-template>
-                                    # Title
-                                    _Subtitle_
-                                  </textarea>
-                                </section>
+        <section data-markdown class="title-slide" data-background-image="images/background_title.png">
+          <textarea data-template>
+            # Spock
+            _Live Long And Prosper!_
+
+            ---
+
+            * April 9, 2018
+            * <a href="https://akeffalas.github.io">Andy Keffalas</a>
+            * <a href="https://github.com/akeffalas"><i class="fab fa-github"></i> akeffalas</a>
+
+          </textarea>
+        </section>
+
+
+        <section>
+          <section data-markdown data-background-image="images/background_section.png">
+            <textarea data-template>
+              # Spock ?!
+            </textarea>
+          </section>
+          <section data-markdown>
+            <script type="text/template">
+            <img src="images/spock_trek.jpg" width="375" height="280">
+            
+            No, not him! <!-- .element: class="fragment" -->
+            </script>
+          </section>
+
+          <section data-markdown>
+            <textarea data-template>
+              ## Spock Testing
+              * A Groovy specification framework that utilizes a Behavior-Driven Development dialect
+
+                - Inspired by RSpec, JUnit, and jMock
+                - Very expressive DSL
+            </textarea>
+          </section>
+          
+          <section data-markdown>
+            <textarea data-template>
+              * An alternative to JUnit
+
+                - Works with the existing tooling support for JUnitRunner
+            </textarea>
+          </section>
+        </section>
+
+
+        <section>
+          <section data-markdown data-background-image="images/background_section.png">
+            <textarea data-template>
+              # Show me!
+            </textarea>
+          </section>
+          
+          <section data-markdown>
+            <textarea data-template>
+              ```groovy
+              class GeneratorSpec extends Specification {
+                def "Ensure that a generated even integer is even!"() {
+                  given: "Create an evenInt generator for testing"
+                  def generator = new Generator("evenInt")
+                  when:
+                  def result = generator.generate()
+                  then:
+                  result % 2 == 0
+                }
+              }
+              ```
+            </textarea>
+          </section>
+          
+          <section data-markdown>
+            <textarea data-template>
+              ## Power Assertions
+                                    
+              <p>On failure, a helpful message is provided:</p>
+ 
+              ```sh
+              GeneratorSpec
+               - Ensure that a generated even integer is even!   FAILED
+                 Condition not satisfied:
+                 
+                 3 % 2 == 0
+                   |   |
+                   1   false
+              ```
+            </textarea>
+          </section>
+        </section>
+
+
+        <section>
+          <section data-markdown data-background-image="images/background_section.png">
+            <textarea data-template>
+              # Concepts
+            </textarea>
+          </section>
+
+          <section data-markdown>
+            <textarea data-template>
+              ## Specifications
+              Describe the expected _features_ of a class (or even a full system)
+            </textarea>
+          </section>
+
+         <section data-markdown>
+           <textarea data-template>
+             ## Feature Methods
+             Describe what is being "tested" for a specification
+           </textarea>
+         </section>
+
+         <section data-markdown>
+            <textarea data-template>
+              ## Feature Phases
+              Each feature method consists of four phases:
+              1. Setup (optional)
+              2. Stimulus injection
+              3. Response expectations
+              4. Cleanup (optional)
+            </textarea>
+          </section>
+
+          <section data-markdown>
+            <textarea data-template>
+              ## Feature Blocks
+              Logical sections of a feature method
+
+              Block | Phase
+              :--- | ----:
+              setup/given | Setup
+              when, expect | Stimulus
+              then, expect | Response
+              cleanup | Cleanup
+              where* | Data-driven testing
+            </textarea>
+          </section>
+        </section>
+
+
+        <section>
+          <section data-markdown data-background-image="images/background_section.png">
+            <textarea data-template>
+              # Data-driven Testing
+            </textarea>
+          </section>
+          
+          <section data-markdown>
+            <textarea data-template>
+              ![Morpheus](images/morpheus.jpg)
+              
+              What if I told you...
+              
+               <p class="fragment fade-up">that you can easily execute a test multiple times with varying inputs and expected results?</p>
+            </textarea>
+          </section>
+
+          <section data-markdown>
+            <textarea data-template>
+              ```groovy
+              class MathPowerSpec extends Specification {
+                @Unroll def "#base to the power of #power is #result"() {
+                  expect:
+                    Math.pow(base, power) == result
+                  where:
+                    base | power || result
+                    1 | 2 || 1
+                    2 | 8 || 256
+                }
+              }
+              ```
+            </textarea>
+          </section>
+
+          <section data-markdown>
+            <textarea data-template>
+            ## Output
+              ```sh
+              MathPowerSpec
+               - 1 to the power of 2 is 1
+               - 2 to the power of 8 is 256
+              ```
+            </textarea>
+          </section>
+          
+          <section data-background-image="images/kane_applause.gif">
+          </section>
+        </section>
+
+
+        <section>
+          <section data-markdown data-background-image="images/background_section.png">
+            <textarea data-template>
+              # Interaction Testing
+            </textarea>
+          </section>
+
+          <section data-markdown>
+            <textarea data-template>
+              What about testing object behaviors?!
+            </textarea>
+          </section>
+
+          <section data-markdown>
+            <textarea data-template>
+              ```groovy
+              class InteractionSpec extends Specification {
+                def "A validator is called once during validation"() {
+                  given:
+                    def validatorMock = Mock(Validator)
+                    def processor = new Processor(validatorMock)
+                  when:
+                    processor.performValidation("foo")
+                  then:
+                    1 * validatorMock.validate("foo") >> true
+                    0 * _
+                }
+              }
+              ```
+              <p class="fragment fade-up">Combines mocking and stubbing!</p>
+            </textarea>
+          </section>
+
+          <section data-background-image="images/andy_omg.gif">
+          </section>
+        </section>
+
+
+        <section data-markdown>
+          <textarea data-template>
+            # Learn More
+
+            [Spock Docs](http://spockframework.org/spock/docs)
+
+            [REPL Console](http://meetspock.appspot.com)
+
+            [![Java Testing with Spock](images/book_spock_java.png)](https://www.manning.com/books/java-testing-with-spock)
+            [![Spock: Up and Running](images/book_spock_run.jpg)](http://shop.oreilly.com/product/0636920038597.do)
+          </textarea>
+        </section>
+
+
+        <section data-markdown class="title-slide" data-background-image="images/background_title.png">
+          <textarea data-template>
+            ## Questions?
+            ![Mark](images/question.gif)
+            * <a href="https://github.com/hakimel/reveal.js"><i class="fab fa-github"></i> revealjs</a>
+          </textarea>
+        </section>
 			</div>
 		</div>
 
