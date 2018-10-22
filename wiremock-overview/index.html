@@ -42,8 +42,340 @@
         </section>
 
 
+        <section>
+          <section data-markdown data-background-image="images/background_section.png">
+            <textarea data-template>
+              # Wire... Mock?!
+            </textarea>
+          </section>
+          <section data-markdown>
+            <textarea data-template>
+              ## WireMock Stubbing
+              * Simulates HTTP/S API implementations
+
+                - Serves static/canned or dynamically generated responses
+                - Supports auditing and verification of received requests
+                
+              <p class="fragment fade-up" style="font-size:.5em;">TCP server socket testing can be done with tools like Montebank</p>
+            </textarea>
+          </section>
+          
+          <section data-markdown>
+            <textarea data-template>
+              ## Why bother?
+              * Helps simulate network and API interactions
+                - Useful if the API implementation doesn't exist yet
+                - Helps provide realistic integration testing with external APIs            
+            </textarea>
+          </section>
+          <section data-markdown>
+            <textarea data-template>
+              * Emulate faults and latency
+                - Configurable latency behaviors
+                - Trigger API error responses on-demand
+            </textarea>
+          </section>                 
+          <section data-markdown>
+            <textarea data-template>
+              * Runs standalone or embedded in JVM applications
+
+                - Perfect for many types of testing (integration, load, and performance)
+                - Allows for the creation of different execution environments (sandbox, testing, etc.)
+            </textarea>
+          </section>
+        </section>
 
 
+        <section>
+          <section data-markdown data-background-image="images/background_section.png">
+            <textarea data-template>
+              # Show me!
+            </textarea>
+          </section>
+          
+          <section data-markdown>
+            <textarea data-template>
+              ## Demo API Endpoint
+              
+              **GET /generate/guid**
+
+              Status | Response
+              :--- | ----:
+              200 | JSON document with a **generatedAt** timestamp and **guid** UUID
+              500 | JSON document with an **errorMessage** String
+            </textarea>
+          </section>
+
+          <section data-markdown>
+            <textarea data-template>
+              ```java
+              stubFor(get(urlEqualTo("/generate/guid"))
+                .willReturn(okJson("{ \"generatedAt\": 1540136669, \"guid\": \"123e4567-e89b-12d3-a456-556642440000\" }")));
+              ```
+            </textarea>
+          </section>
+          
+          <section data-markdown>
+            <textarea data-template>
+              ```sh
+              GET /generate/guid HTTP/1.1
+              
+              HTTP/1.1 200 OK
+              Content-Type: application/json
+              {
+                "generatedAt": 1540136669,
+                "guid": "123e4567-e89b-12d3-a456-556642440000"
+              }
+              ```
+            </textarea>
+          </section>          
+
+          <section data-markdown>
+            <textarea data-template>
+              ![Burns](images/excellent.png)
+            </textarea>
+          </section>          
+        </section>
+
+
+        <section>
+          <section data-markdown data-background-image="images/background_section.png">
+            <textarea data-template>
+              # Request Matching
+            </textarea>
+          </section>
+          
+          <section data-markdown>
+            <textarea data-template>
+              Requests can be matched on:
+              - URL
+              - HTTP method
+              - Query parameters
+              - Headers
+              - Request body
+            </textarea>
+          </section>
+
+          <section data-markdown>
+            <textarea data-template>
+              ```java
+              stubFor(get(urlEqualTo("/generate/guid"))
+                .withHeader("Trigger", equalToIgnoreCase("Bad-Error"))
+                .willReturn(serverError()
+                  .withHeader("Content-Type", "application/json")
+                  .withBody(mapper.writeValueAsString(
+                    ImmutableMap.of("errorMessage", "Something bad happened")))));
+              ```
+              <p class="fragment fade-up">Uses URL, HTTP method, and header matching</p>
+            </textarea>
+          </section>
+          
+          <section data-markdown>
+            <textarea data-template>
+              ```sh
+              GET /generate/guid HTTP/1.1
+              Trigger: Bad-Error
+              
+              HTTP/1.1 500 Server Error
+              Content-Type: application/json
+              {
+                  "errorMessage": "Something bad happened"
+              }
+              ```
+            </textarea>
+          </section>
+          
+          <section data-markdown>
+            <textarea data-template>
+              ![Easy Button](images/easy-button.jpg)
+            </textarea>
+          </section>                                    
+        </section>
+        
+        
+        <section>
+          <section data-markdown data-background-image="images/background_section.png">
+            <textarea data-template>
+              # Response Content
+            </textarea>
+          </section>
+
+          <section data-markdown>
+            <textarea data-template>
+              ## Static file
+              * Allows API stub to serve static content
+                - Easy to use
+                - Perfect for playback of recorded API responses
+            </textarea>
+          </section>          
+          
+          <section data-markdown>
+            <textarea data-template>
+              guid-success.json
+              ```javascript
+              {
+                "generatedAt": 1540136669,
+                "guid": "123e4567-e89b-12d3-a456-556642440000"
+              }
+              ```
+            </textarea>
+          </section>
+              
+          <section data-markdown>
+            <textarea data-template>
+              ```java
+              stubFor(get(urlEqualTo("/generate/guid"))
+                .willReturn(aResponse()
+                  .withStatus(200)
+                  .withHeader("Content-Type", "application/json")
+                  .withBodyFile("guid-success.json")));
+              ```
+            </textarea>
+          </section>
+                              
+          <section data-markdown>
+            <textarea data-template>
+              ## Templated static file
+              * WireMock provides built-in templates
+                - Uses Handlebars
+            </textarea>
+          </section> 
+
+          <section data-markdown>
+            <textarea data-template>
+              guid-success-template.json
+              ```javascript
+              {
+                "generatedAt": {{now format='epoch'}},
+                "guid": "{{randomValue type='UUID'}}"
+              }
+              ```
+            </textarea>
+          </section>
+                   
+          <section data-markdown>
+            <textarea data-template>
+              ```java
+              stubFor(get(urlEqualTo("/generate/guid"))
+                .willReturn(aResponse()
+                  .withStatus(200)
+                  .withHeader("Content-Type", "application/json")
+                  .withBodyFile("guid-success-template.json")
+                  .withTransformers("response-template")));
+              ```
+              <p class="fragment fade-up">Generates new values on each request!</p>
+            </textarea>
+          </section>
+                              
+          <section data-markdown>
+            <textarea data-template>
+              ## Custom generation
+              * Custom code can create response content
+                - POJOs serialized to String or byte[]
+                - Response transformer extension
+            </textarea>
+          </section>         
+
+          <section data-markdown>
+            <textarea data-template>
+              ```java
+              final Map<String, Object> responseFields = ImmutableMap.of(
+                "generatedAt", Instant.now(),
+                "guid", UUID.randomUUID().toString());
+              
+              stubFor(get(urlEqualTo("/generate/guid"))
+                .willReturn(ok()
+                  .withHeader("Content-Type", "application/json")
+                  .withBody(mapper.writeValueAsString(responseFields))));
+              ```
+              <p class="fragment fade-up">Returns the same fields on each request<br> Use a transformer for per-request generation!</p>
+            </textarea>
+          </section>
+        </section>
+
+
+        <section>
+          <section data-markdown data-background-image="images/background_section.png">
+            <textarea data-template>
+              # Emulating Latency
+            </textarea>
+          </section>
+        
+          <section data-markdown>
+            <textarea data-template>
+              Responses can be delayed with:
+              - Fixed value
+              - Random value
+              - Uniform distribution
+              - Log-normal distribution
+            </textarea>
+          </section>        
+        
+          <section data-markdown>
+            <textarea data-template>
+              ## Log-normal Delay
+              * Useful for providing realistic API latencies
+                - Centered at p50 and uses a sigma to determine tail length
+                - Provides a good approximation of API response time percentiles
+            </textarea>
+          </section>
+                     
+          <section data-markdown>
+            <textarea data-template>
+              ```java
+              stubFor(get(urlEqualTo("/generate/guid"))
+                .willReturn(ok()
+                  .withHeader("Content-Type", "application/json")
+                  .withBodyFile("guid-success.json")    
+                  .withLogNormalRandomDelay(200, .5)));
+              ```
+            </textarea>
+          </section> 
+          
+          <section data-markdown>
+            <textarea data-template>
+              ## Distribution Percentiles
+              
+              Percentile | Value (ms)
+              :--- | ----:
+              50 | 200
+              95 | 455.203
+              99 | 640.015
+              
+              <p style="font-size:.5em;">Normal mean: log(200)<br>Normal std dev: sigma = 0.5</p>
+            </textarea>
+          </section>
+                 
+          <section data-markdown>
+            <textarea data-template>
+              ## Observed Percentiles
+              
+              ```sh
+              Requests  [total, rate] 200, 20.10
+              Duration  [total]       10.151580372s
+              Latencies [50, 95, 99]  193.91414ms, 447.604417ms, 651.573833ms
+              Success   [ratio]       100.00%
+              ```
+              <p style="font-size:.5em;">Truncated output from vegeta v12.0.0</p>
+            </textarea>
+          </section>   
+          
+          <section data-background-image="images/norris.gif">
+          </section>                              
+        </section>
+        
+        
+        <section data-markdown>
+          <textarea data-template>
+            # Learn More
+
+            [WireMock Docs](http://wiremock.org/docs)
+
+            [GitHub Repo](https://github.com/tomakehurst/wiremock)
+          </textarea>
+        </section>
+        
+                
         <section data-markdown class="title-slide" data-background-image="images/background_title.png">
           <textarea data-template>
             ## Questions?
