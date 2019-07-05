@@ -1,0 +1,45 @@
+.reveal code { 
+  font: 28px/1.4 "Inconsolata", monospace; 
+}
+
+.reveal section img {
+  margin: 5px 0px;
+  background: none;
+  border: none;
+  box-shadow: none;
+}
+
+.title-slide {
+  data-background-color: hsla(120, 100%, 25%, 0.2);
+}
+
+.title-slide h1 {
+  font-family: 'Roboto', sans-serif;
+}
+
+.title-slide hr {
+  background-color: white;
+  height: 2px;
+  border: 0;
+  box-shadow: 0 15px 15px -15px #8c8b8b inset;
+}
+
+.title-slide ul {
+  display: block;
+  text-align: right;
+  list-style-type: none;
+  font-size: .6em;
+}
+
+.title-slide p, ul {
+  font-family: 'Open Sans', sans-serif !important;
+}
+
+.title-slide thead {
+  display: none;
+}
+
+.title-slide table td {
+  border-bottom: 0;
+}
+
