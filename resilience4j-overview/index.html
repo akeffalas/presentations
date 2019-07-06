@@ -30,7 +30,7 @@
         <section data-markdown class="title-slide" data-background-image="images/background_title.png">
           <textarea data-template>
             # resilience4j
-            _Resiliency Patterns with Modern Java_
+            _Resiliency Techniques with Modern Java_
 
             ---
 
@@ -41,7 +41,396 @@
           </textarea>
         </section>
 
+
+        <section>
+          <section data-markdown data-background-image="images/background_section.png">
+            <textarea data-template>
+              # Application Resiliency
+            </textarea>
+          </section>
+          <section data-markdown>
+            <textarea data-template>
+              ## Key Traits
+              * Fault tolerance and isolation
+              * Flow control
+              * Load shedding
+              * Proactive and reactive monitoring and alerting
+              * Rapid, automated resource provisioning
+            </textarea>
+          </section>
+          
+          <section data-markdown>
+            <textarea data-template>
+              ## Why bother?
+              * To help ensure that your system can bend, but not break under duress
+                - It's better to degrade system performance rather than failing spectacularly
+            </textarea>
+          </section>
+          <section data-markdown>
+            <textarea data-template>
+              ## Techniques
+              * Bulkheads
+                - Isolate potential failures (e.g. thread pools)
+              * Rate Limiting
+                - Load shedding
+              * Retries
+              * Timeouts
+              * Circuit Breakers
+            </textarea>
+          </section>
+          <section data-markdown>
+            <textarea data-template>
+              ### Release It! by Michael Nygard
+              * Introduced the "circuit breaker" technique
+              * Excellent examples of resiliency approaches
+
+              ![Release It](images/releaseit.jpg)
+              <img src="images/nygard.jpeg" width="225" height="230">
+            </textarea>
+          </section>
+        </section>
         
+
+        <section>
+          <section data-markdown data-background-image="images/background_section.png">
+            <textarea data-template>
+              # resilience4j
+            </textarea>
+          </section>
+          <section data-markdown>
+            <textarea data-template>
+              ## At a glance
+              * Fault tolerance library 
+                - Java 8+ and functional style (with Vavr)
+              * Modern successor to Hystrix
+                - more lightweight with fewer dependencies
+                - enhances any functional interface, lambda expression, or method reference
+                - can "combine" multiple tools (ex. timeouts with a circuit breaker)
+            </textarea>
+          </section>
+
+          <section data-markdown>
+            <textarea data-template>
+              * Highly modular 
+                - separate JARs for each major tool
+              * Built-in support for: circuit breakers, rate limiting, retries, and bulkheads
+              * Community-driven extensions for: timeouts, caches, RxJava, and Spring Boot
+            </textarea>
+          </section>
+        </section>
+
+        <section>
+          <section data-markdown data-background-image="images/background_section.png">
+            <textarea data-template>
+              # Rate Limiting
+            </textarea>
+          </section>
+          <section data-markdown>
+            <textarea data-template>
+              ## Purpose
+              * Load shedding
+                - Prevent excessive requests from toppling your system
+              * Sends a message to your client(s)
+                - HTTP 429 tells requestors to "slow down" (flow control)
+            </textarea>
+          </section>
+
+          <section data-markdown>
+            <textarea data-template>
+              ## Rate Limiter Configuration
+
+              ```java
+@RestController
+public class RateController {
+  private final RateLimiter rateLimiter;
+
+  public RateController() {
+    var rateLimiterConfig =
+        RateLimiterConfig.custom()
+            .limitRefreshPeriod(Duration.ofSeconds(1))
+            .limitForPeriod(5)
+            .build();
+
+    var rateLimiterRegistry = RateLimiterRegistry.of(rateLimiterConfig);
+
+    rateLimiter = rateLimiterRegistry.rateLimiter("limiter", rateLimiterConfig);
+    rateLimiter.getEventPublisher().onEvent(event -> System.out.println("event: " + event));
+  }
+}
+              ```
+            </textarea>
+          </section>
+
+          <section data-markdown>
+            <textarea data-template>
+              ## Rate Limit Usage
+
+              ```java
+  @RequestMapping("/rate")
+  public String rate() {
+    var valueConsumer = RateLimiter.decorateConsumer(rateLimiter, this::processValue);
+    valueConsumer.accept(42);
+
+    return "OK";
+  }
+
+  private void processValue(int value) {
+    System.out.println("Value: " + value);
+  }
+              ```
+            </textarea>
+          </section>
+
+          <section data-markdown>
+            <textarea data-template>
+              ```sh
+              echo "GET http://localhost:8080/rate" | vegeta -cpus=2 attack -duration=10s -rate=10/1s
+              ```
+            </textarea>
+          </section>
+
+          <section data-markdown>
+            <textarea data-template>
+            ## Output
+              ```sh
+event: RateLimiterEvent{type=SUCCESSFUL_ACQUIRE, rateLimiterName='limiter'}
+Value: 42
+event: RateLimiterEvent{type=SUCCESSFUL_ACQUIRE, rateLimiterName='limiter'}
+Value: 42
+event: RateLimiterEvent{type=SUCCESSFUL_ACQUIRE, rateLimiterName='limiter'}
+Value: 42
+event: RateLimiterEvent{type=SUCCESSFUL_ACQUIRE, rateLimiterName='limiter'}
+Value: 42
+event: RateLimiterEvent{type=SUCCESSFUL_ACQUIRE, rateLimiterName='limiter'}
+Value: 42
+event: RateLimiterEvent{type=FAILED_ACQUIRE, rateLimiterName='limiter'}
+io.github.resilience4j.ratelimiter.RequestNotPermitted: RateLimiter 'limiter' does not permit further calls
+              ```
+            </textarea>
+          </section>
+
+          <section data-markdown>
+            <textarea data-template>
+              ![Gandalf](images/shallnotpass.gif)
+            </textarea>
+          </section>
+        </section>
+
+        <section>
+          <section data-markdown data-background-image="images/background_section.png">
+            <textarea data-template>
+              # Retries
+            </textarea>
+          </section>
+          <section data-markdown>
+            <textarea data-template>
+              ## Purpose
+              * Best-effort attempt to achieve behavior
+                - Transient failures could be "resolved" after first execution
+              * Potentially reduces load on system
+                - Perform retries on behalf of client rather than receiving new requests
+            </textarea>
+          </section>
+
+          <section data-markdown>
+            <textarea data-template>
+              ## Retry Configuration
+
+              ```java
+@RestController
+public class RetryController {
+  private final Retry retry;
+  private final RestTemplate restTemplate = new RestTemplate();
+
+  public RetryController() {
+    var retryConfig =
+	RetryConfig.custom()
+	    .maxAttempts(5)
+	    .retryExceptions(HttpServerErrorException.class)
+	    .intervalFunction(IntervalFunction.ofExponentialBackoff())
+	    .build();
+
+    retry = Retry.of("fooService", retryConfig);
+    retry.getEventPublisher().onEvent(event -> System.out.println("event: " + event));
+  }
+}
+              ```
+            </textarea>
+          </section>
+
+          <section data-markdown>
+            <textarea data-template>
+              ## Retry Usage
+
+              ```java
+  @RequestMapping("/retry")
+  public String retry() throws Exception {
+    Supplier<ResponseEntity<String>> supplier =
+        () -> restTemplate.getForEntity("http://localhost:8089/foo", String.class);
+
+    var retryableSupplier = Retry.decorateSupplier(retry, supplier);
+    var response = Try.ofSupplier(retryableSupplier).get();
+
+    return response.getBody();
+  }
+              ```
+            </textarea>
+          </section>
+
+          <section data-markdown>
+            <textarea data-template>
+              ```sh
+              GET /retry HTTP/1.1
+              
+              HTTP/1.1 500
+              Content-Type: application/json;charset=UTF-8
+{
+"error": "Internal Server Error",
+"message": "500 Server Error",
+"status": 500
+}
+              ```
+            </textarea>
+          </section> 
+
+          <section data-markdown>
+            <textarea data-template>
+            ## Output
+              ```sh
+event: Retry 'fooService', waiting PT0.5S until attempt #1. Last attempt failed with exception HttpServerErrorException: 500 Server Error
+event: Retry 'fooService', waiting PT0.75S until attempt #2. Last attempt failed with exception HttpServerErrorException: 500 Server Error
+event: Retry 'fooService', waiting PT1.125S until attempt #3. Last attempt failed with exception HttpServerErrorException: 500 Server Error
+event: Retry 'fooService', waiting PT1.687S until attempt #4. Last attempt failed with exception HttpServerErrorException: 500 Server Error
+event: Retry 'fooService' recorded a failed retry attempt. Number of retry attempts: '5', Last exception was: 'HttpServerErrorException: 500 Server Error'
+              ```
+            </textarea>
+          </section>
+
+          <section data-markdown>
+            <textarea data-template>
+              ![Burns](images/excellent.png)
+            </textarea>
+          </section> 
+        </section>
+
+
+        <section>
+          <section data-markdown data-background-image="images/background_section.png">
+            <textarea data-template>
+              # Timeouts
+            </textarea>
+          </section>
+          <section data-markdown>
+            <textarea data-template>
+              ## Purpose
+              * Reduce blocking I/O 
+                - Lowers CPU iowait time
+              * Sheds load at the cost of higher failure rates
+              * May require the "black art" of timeout tuning
+                - Timeout configurations may have no effect if max execution time is exceeded
+            </textarea>
+          </section>
+
+          <section data-markdown>
+            <textarea data-template>
+              ## External Endpoint
+              ```java
+              wireMockServer.stubFor(get(urlEqualTo("/generate/guid"))
+                .willReturn(ok()
+                .withHeader("Content-Type", "application/json")
+                .withBodyFile("guid-success.json")
+                .withLogNormalRandomDelay(350, .9)));
+              ```
+            </textarea>
+          </section>
+
+          <section data-markdown>
+            <textarea data-template>
+              ## Distribution Percentiles
+              
+              Percentile | Value (ms)
+              :--- | ----:
+              50 | 350
+              95 | 1538.1
+              99 | 2840.25
+              
+              <p style="font-size:.5em;">Normal mean: log(350)<br>Normal std dev: sigma = 0.9</p>
+            </textarea>
+          </section>
+
+          <section data-markdown>
+            <textarea data-template>
+              ## Performance Without Timeouts
+              
+              ```sh
+              Requests      [total, rate]   50, 5.10
+              Duration      [total, wait]   11.095215629s, 1.294998089s
+              Latencies     [50, 95, 99]    295.492271ms, 1.694001205s, 2.992904057s
+              Status Codes  [code:count]    200:50
+              ```
+              <p style="font-size:.5em;">Truncated output from vegeta v12.0.0</p>
+            </textarea>
+          </section>
+
+          <section data-markdown>
+            <textarea data-template>
+              ## Timeout Configuration
+
+              ```java
+@RestController
+public class TimeoutController {
+  private final TimeLimiter timeLimiter;
+  private final RestTemplate restTemplate = new RestTemplate();
+
+  public TimeoutController() {
+    var timeLimiterconfig =
+        TimeLimiterConfig.custom().timeoutDuration(Duration.ofMillis(500)).build();
+    timeLimiter = TimeLimiter.of(timeLimiterconfig);
+  }
+}
+              ```
+            </textarea>
+          </section>
+
+          <section data-markdown>
+            <textarea data-template>
+              ## Timeout Usage
+
+              ```java
+  @RequestMapping("/timeout")
+  public String timeout() throws Exception {
+    var guidAsyncFuture =
+        CompletableFuture.supplyAsync(
+            () -> restTemplate.getForEntity("http://localhost:8089/generate/guid", String.class));
+    Supplier<Future<ResponseEntity<String>>> supplier = () -> guidAsyncFuture;
+    var timeoutableGuidCall = TimeLimiter.decorateFutureSupplier(timeLimiter, supplier);
+
+    var guidResponse = timeoutableGuidCall.call();
+    return guidResponse.getBody();
+  }
+              ```
+            </textarea>
+          </section>
+
+          <section data-markdown>
+            <textarea data-template>
+              ## Performance With Timeouts
+              
+              ```sh
+              Requests      [total, rate]   50, 5.10
+              Duration      [total, wait]   10.306236893s, 506.328658ms
+              Latencies     [50, 95, 99]    432.721255ms, 515.053553ms, 644.20849ms
+              Status Codes  [code:count]    200:31  500:19
+              ```
+              <p style="font-size:.5em;">Truncated output from vegeta v12.0.0</p>
+            </textarea>
+          </section>
+
+          <section data-background-image="images/norris.gif">
+          </section>
+        </section>
+
+
         <section data-markdown>
           <textarea data-template>
             # Learn More
