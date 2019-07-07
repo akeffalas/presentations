@@ -62,7 +62,7 @@
           <section data-markdown>
             <textarea data-template>
               ## Why bother?
-              * To help ensure that your system can bend, but not break under duress
+              * To help ensure that your system can bend, but not break under pressure
                 - It's better to degrade system performance rather than failing spectacularly
             </textarea>
           </section>
@@ -72,7 +72,6 @@
               * Bulkheads
                 - Isolate potential failures (e.g. thread pools)
               * Rate Limiting
-                - Load shedding
               * Retries
               * Timeouts
               * Circuit Breakers
@@ -209,10 +208,7 @@ io.github.resilience4j.ratelimiter.RequestNotPermitted: RateLimiter 'limiter' do
             </textarea>
           </section>
 
-          <section data-markdown>
-            <textarea data-template>
-              ![Gandalf](images/shallnotpass.gif)
-            </textarea>
+          <section data-background-image="images/shallnotpass.gif">
           </section>
         </section>
 
@@ -229,6 +225,16 @@ io.github.resilience4j.ratelimiter.RequestNotPermitted: RateLimiter 'limiter' do
                 - Transient failures could be "resolved" after first execution
               * Potentially reduces load on system
                 - Perform retries on behalf of client rather than receiving new requests
+            </textarea>
+          </section>
+
+          <section data-markdown>
+            <textarea data-template>
+              ## Example Interaction
+              <img src="images/example_interaction.png">
+
+              * User makes a request that requires interaction with an external service
+                - FooService is not "ours" and may be flaky
             </textarea>
           </section>
 
@@ -431,6 +437,126 @@ public class TimeoutController {
         </section>
 
 
+        <section>
+          <section data-markdown data-background-image="images/background_section.png">
+            <textarea data-template>
+              # Circuit Breakers
+            </textarea>
+          </section>
+          <section data-markdown>
+            <textarea data-template>
+              ## Purpose
+              * Auto-detect external problems
+                - Fail-fast when downstream service is failing
+                - Periodically tries to restore connectivity
+              * Sheds load at the cost of higher failure rates
+              * Best Practices
+                - dynamic threshold configurations
+                - monitor and alert on breaker status
+            </textarea>
+          </section>
+
+          <section data-markdown>
+            <textarea data-template>
+              ### State Machine
+              <img src="images/breaker_state_diagram.png">
+            </textarea>
+          </section>
+
+          <section data-markdown>
+            <textarea data-template>
+              ### resilience4j Ring Bit Buffer
+              <img src="images/ring_buffer.jpg">
+              * Stores the success/failure statuses
+                - 0 for success, 1 for failure
+              * Very compact; uses long[] vs boolean[]
+                - 16 long values holds 1024 (16 * 64) statuses
+              * Must be full before rate thresholds calculated
+                - Breaker will not trip otherwise
+            </textarea>
+          </section>
+
+          <section data-markdown>
+            <textarea data-template>
+              ## Breaker Configuration
+
+              ```java
+@RestController
+public class BreakerController {
+  private final CircuitBreaker circuitBreaker;
+  private final RestTemplate restTemplate = new RestTemplate();
+
+  public BreakerController() {
+    var circuitBreakerConfig =
+        CircuitBreakerConfig.custom()
+            .failureRateThreshold(55)
+            .ringBufferSizeInHalfOpenState(5)
+            .ringBufferSizeInClosedState(10)
+            .recordExceptions(HttpServerErrorException.class)
+            .build();
+
+    circuitBreaker = CircuitBreaker.of("breaker", circuitBreakerConfig);
+    circuitBreaker.getEventPublisher().onEvent(event -> System.out.println("event: " + event));
+  }
+}
+              ```
+            </textarea>
+          </section>
+
+          <section data-markdown>
+            <textarea data-template>
+              ## Breaker Usage
+
+              ```java
+  @RequestMapping("/breaker")
+  public String breaker() {
+    var decoratedCheckedSupplier =
+        CircuitBreaker.decorateCheckedSupplier(
+            circuitBreaker,
+            () -> restTemplate.getForEntity("http://localhost:8089/foo", String.class));
+
+    var response = Try.of(decoratedCheckedSupplier).get();
+    return response.getBody();
+  }
+              ```
+            </textarea>
+          </section>
+
+          <section data-markdown>
+            <textarea data-template>
+            ## Output
+              ```sh
+event: CircuitBreaker 'breaker' recorded an error: 'HttpServerErrorException: 500 Server Error'. Elapsed time: 6 ms
+event: CircuitBreaker 'breaker' recorded an error: 'HttpServerErrorException: 500 Server Error'. Elapsed time: 9 ms
+event: CircuitBreaker 'breaker' recorded an error: 'HttpServerErrorException: 500 Server Error'. Elapsed time: 7 ms
+event: CircuitBreaker 'breaker' recorded an error: 'HttpServerErrorException: 500 Server Error'. Elapsed time: 6 ms
+event: CircuitBreaker 'breaker' recorded an error: 'HttpServerErrorException: 500 Server Error'. Elapsed time: 9 ms
+event: CircuitBreaker 'breaker' recorded an error: 'HttpServerErrorException: 500 Server Error'. Elapsed time: 9 ms
+event: CircuitBreaker 'breaker' recorded an error: 'HttpServerErrorException: 500 Server Error'. Elapsed time: 8 ms
+event: CircuitBreaker 'breaker' recorded an error: 'HttpServerErrorException: 500 Server Error'. Elapsed time: 8 ms
+event: CircuitBreaker 'breaker' recorded an error: 'HttpServerErrorException: 500 Server Error'. Elapsed time: 8 ms
+event: CircuitBreaker 'breaker' recorded an error: 'HttpServerErrorException: 500 Server Error'. Elapsed time: 9 ms
+event: CircuitBreaker 'breaker' changed state from CLOSED to OPEN
+event: CircuitBreaker 'breaker' recorded a call which was not permitted.
+event: CircuitBreaker 'breaker' recorded a call which was not permitted.
+event: CircuitBreaker 'breaker' changed state from OPEN to HALF_OPEN
+event: CircuitBreaker 'breaker' recorded a successful call. Elapsed time: 116 ms
+event: CircuitBreaker 'breaker' recorded a successful call. Elapsed time: 89 ms
+event: CircuitBreaker 'breaker' recorded a successful call. Elapsed time: 20 ms
+event: CircuitBreaker 'breaker' recorded a successful call. Elapsed time: 67 ms
+event: CircuitBreaker 'breaker' recorded a successful call. Elapsed time: 42 ms
+event: CircuitBreaker 'breaker' changed state from HALF_OPEN to CLOSED
+event: CircuitBreaker 'breaker' recorded a successful call. Elapsed time: 8 ms
+event: CircuitBreaker 'breaker' recorded a successful call. Elapsed time: 28 ms
+              ```
+            </textarea>
+          </section>
+
+          <section data-background-image="images/borat.gif">
+          </section>
+        </section>
+
+
         <section data-markdown>
           <textarea data-template>
             # Learn More
@@ -438,6 +564,8 @@ public class TimeoutController {
             [resilience4j Docs](https://resilience4j.readme.io/docs)
 
             [GitHub Repo](https://github.com/resilience4j/resilience4j)
+
+            [![Release It](images/releaseit.jpg)](https://pragprog.com/book/mnee2/release-it-second-edition)
           </textarea>
         </section>
         
